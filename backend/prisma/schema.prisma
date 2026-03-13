@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model device_fingerprints {
+  id           String    @id(map: "PK_c75302ebdfe63b01321380e5780") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  fingerprint  String    @db.VarChar(255)
+  device_name  String?   @db.VarChar(255)
+  browser      String?   @db.VarChar(100)
+  os           String?   @db.VarChar(100)
+  ip_address   String?   @db.VarChar(50)
+  is_trusted   Boolean   @default(false)
+  last_seen_at DateTime? @db.Timestamp(6)
+  created_at   DateTime  @default(now()) @db.Timestamp(6)
+  user_id      String?   @db.Uuid
+  users        users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_d3e9a1f3ca3af3eeaab8ca2ed9e")
+
+  @@index([fingerprint], map: "idx_device_fp_fingerprint")
+  @@index([user_id], map: "idx_device_fp_user_id")
+}
+
+model login_history {
+  id             String                    @id(map: "PK_fe377f36d49c39547cb6b9f0727") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  action         login_history_action_enum
+  ip_address     String?                   @db.VarChar
+  user_agent     String?                   @db.VarChar(512)
+  device_info    String?                   @db.VarChar
+  success        Boolean?
+  failure_reason String?                   @db.VarChar
+  created_at     DateTime                  @default(now()) @db.Timestamp(6)
+  user_id        String?                   @db.Uuid
+  users          users?                    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_ad9ce49cb73c0b33746a56b6bd1")
+}
+
+model notifications {
+  id         String                     @id(map: "PK_6a72c3c0f683f6462415e653c3a") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  title      String                     @db.VarChar(255)
+  message    String                     @db.VarChar(2000)
+  type       notifications_type_enum
+  channel    notifications_channel_enum
+  is_read    Boolean                    @default(false)
+  read_at    DateTime?                  @db.Timestamp(6)
+  data       String?                    @db.VarChar(2000)
+  created_at DateTime                   @default(now()) @db.Timestamp(6)
+  user_id    String?                    @db.Uuid
+  users      users?                     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_9a8a82462cab47c73d25f49261f")
+
+  @@index([created_at], map: "idx_notification_created_at")
+  @@index([is_read], map: "idx_notification_is_read")
+  @@index([user_id], map: "idx_notification_user_id")
+}
+
+model refresh_tokens {
+  id             String    @id(map: "PK_7d8bee0204106019488c4c50ffa") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  token          String    @unique(map: "UQ_4542dd2f38a61354a040ba9fd57") @db.VarChar
+  is_revoked     Boolean   @default(false)
+  expires_at     DateTime  @db.Timestamp(6)
+  user_agent     String?   @db.VarChar(512)
+  ip_address     String?   @db.VarChar
+  device_info    String?   @db.VarChar
+  last_active_at DateTime? @db.Timestamp(6)
+  created_at     DateTime  @default(now()) @db.Timestamp(6)
+  user_id        String?   @db.Uuid
+  users          users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_3ddc983c5f7bcf132fd8732c3f4")
+}
+
+model roles {
+  id         String          @id(map: "PK_c1433d71a4838793a49dcad46ab") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name       roles_name_enum @unique(map: "UQ_648e3f5447f725579d7d4ffdfb7")
+  user_roles user_roles[]
+}
+
+model security_questions {
+  id          String   @id(map: "PK_40863dac02e72e1ea928b07d5ad") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  question    String   @db.VarChar(500)
+  answer_hash String   @db.VarChar(255)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+  user_id     String?  @db.Uuid
+  users       users?   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_f2c2fb415138d89ce45146e5fe3")
+}
+
+model user_roles {
+  users_id String @db.Uuid
+  roles_id String @db.Uuid
+  roles    roles  @relation(fields: [roles_id], references: [id], onDelete: Cascade, map: "FK_4a08d003e00caf075a4a212d23d")
+  users    users  @relation(fields: [users_id], references: [id], onDelete: Cascade, map: "FK_8e1215206acb19f1c38dbda9091")
+
+  @@id([users_id, roles_id], map: "PK_65ec3daed53f391c53df7e2e8fb")
+  @@index([roles_id], map: "IDX_4a08d003e00caf075a4a212d23")
+  @@index([users_id], map: "IDX_8e1215206acb19f1c38dbda909")
+}
+
+model users {
+  id                             String                   @id(map: "PK_a3ffb1c0c8416b9fc6f907b7433") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  created_at                     DateTime                 @default(now()) @db.Timestamp(6)
+  updated_at                     DateTime                 @default(now()) @db.Timestamp(6)
+  email                          String                   @unique(map: "UQ_97672ac88f789774dd47f7c8be3") @db.VarChar
+  password                       String?                  @db.VarChar
+  first_name                     String                   @db.VarChar
+  last_name                      String                   @db.VarChar
+  phone                          String?                  @db.VarChar
+  avatar_url                     String?                  @db.VarChar
+  date_of_birth                  DateTime?                @db.Date
+  gender                         String?                  @db.VarChar(20)
+  provider                       users_provider_enum      @default(LOCAL)
+  provider_id                    String?                  @db.VarChar
+  email_verified                 Boolean                  @default(false)
+  email_verification_token       String?                  @db.VarChar
+  email_verification_expiry      DateTime?                @db.Timestamp(6)
+  password_reset_token           String?                  @db.VarChar
+  password_reset_expiry          DateTime?                @db.Timestamp(6)
+  two_factor_enabled             Boolean                  @default(false)
+  two_factor_secret              String?                  @db.VarChar
+  is_active                      Boolean                  @default(true)
+  is_locked                      Boolean                  @default(false)
+  failed_login_attempts          Int                      @default(0)
+  lock_time                      DateTime?                @db.Timestamp(6)
+  last_login_at                  DateTime?                @db.Timestamp(6)
+  last_login_ip                  String?                  @db.VarChar(50)
+  is_deleted                     Boolean                  @default(false)
+  deleted_at                     DateTime?                @db.Timestamp(6)
+  language                       String                   @default("en") @db.VarChar(10)
+  timezone                       String                   @default("UTC") @db.VarChar(50)
+  notification_email_enabled     Boolean                  @default(true)
+  notification_push_enabled      Boolean                  @default(true)
+  notification_in_app_enabled    Boolean                  @default(true)
+  notification_security_enabled  Boolean                  @default(true)
+  notification_order_enabled     Boolean                  @default(true)
+  notification_promotion_enabled Boolean                  @default(false)
+  profile_public                 Boolean                  @default(false)
+  show_email                     Boolean                  @default(false)
+  show_phone                     Boolean                  @default(false)
+  show_activity_status           Boolean                  @default(true)
+  delete_status                  users_delete_status_enum @default(ACTIVE)
+  delete_requested_at            DateTime?                @db.Timestamp(6)
+  fcm_token                      String?                  @db.VarChar(500)
+  device_fingerprints            device_fingerprints[]
+  login_history                  login_history[]
+  notifications                  notifications[]
+  refresh_tokens                 refresh_tokens[]
+  security_questions             security_questions[]
+  user_roles                     user_roles[]
+}
+
+enum login_history_action_enum {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  LOGOUT_ALL
+  LOGOUT_SESSION
+  MFA_ENABLED
+  MFA_DISABLED
+  PASSWORD_CHANGED
+  ACCOUNT_LOCKED
+  ACCOUNT_DELETED
+}
+
+enum notifications_channel_enum {
+  EMAIL
+  PUSH
+  IN_APP
+  WEB_PUSH
+}
+
+enum notifications_type_enum {
+  SYSTEM
+  SECURITY
+  ACCOUNT
+  ORDER
+  PROMOTION
+  PUSH
+  EMAIL
+  IN_APP
+}
+
+enum roles_name_enum {
+  ADMIN
+  USER
+  MODERATOR
+}
+
+enum users_delete_status_enum {
+  ACTIVE
+  DELETE_REQUESTED
+  GRACE_PERIOD
+  PERMANENTLY_DELETED
+}
+
+enum users_provider_enum {
+  LOCAL
+  GOOGLE
+  GITHUB
+}
