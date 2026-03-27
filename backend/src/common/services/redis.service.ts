@@ -309,4 +309,45 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`Redis disconnect error: ${err.message}`);
     }
   }
+
+  // ─── New methods for token.service ─────────────────────────────────────────
+
+  /** Set NX (only if not exists). Returns true if set, false if already existed. */
+  async setNx(key: string, value: string, ttlSeconds?: number): Promise<boolean> {
+    if (!this.isConnected) return false;
+    try {
+      let result: any;
+      if (ttlSeconds) {
+        result = await this.client.set(key, value, 'EX', ttlSeconds, 'NX');
+      } else {
+        result = await this.client.setnx(key, value);
+      }
+      return result === 'OK' || result === 1;
+    } catch (err) {
+      this.logger.error(`Redis setNx error for key ${key}: ${err.message}`);
+      return false;
+    }
+  }
+
+  /** Scan + return all keys matching pattern */
+  async keys(pattern: string): Promise<string[]> {
+    if (!this.isConnected) return [];
+    try {
+      return await this.client.keys(pattern);
+    } catch (err) {
+      this.logger.error(`Redis keys error for pattern ${pattern}: ${err.message}`);
+      return [];
+    }
+  }
+
+  /** Delete multiple keys at once */
+  async delMany(keys: string[]): Promise<void> {
+    if (!this.isConnected || keys.length === 0) return;
+    try {
+      await this.client.del(...keys);
+    } catch (err) {
+      this.logger.error(`Redis delMany error: ${err.message}`);
+    }
+  }
 }
+

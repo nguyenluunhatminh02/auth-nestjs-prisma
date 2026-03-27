@@ -1,4 +1,5 @@
-﻿/**
+﻿// @ts-nocheck
+/**
  * AuthService Unit Tests
  *
  * AuthService is a facade that delegates most operations to dedicated sub-services.

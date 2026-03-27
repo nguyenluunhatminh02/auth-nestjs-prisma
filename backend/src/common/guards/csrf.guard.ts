@@ -45,6 +45,7 @@ export class CsrfGuard implements CanActivate {
 
       // Set CSRF token in response header and cookie
       response.setHeader(this.HEADER_NAME, token);
+      response.setHeader('Access-Control-Expose-Headers', this.HEADER_NAME);
       response.cookie('csrf_token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

@@ -64,6 +64,13 @@ async function bootstrap() {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token'],
+    exposedHeaders: ['x-csrf-token'],
+  });
+
+  // Ensure Access-Control-Expose-Headers is set for CSRF token visibility
+  app.use((_req: any, res: any, next: any) => {
+    res.setHeader('Access-Control-Expose-Headers', 'x-csrf-token');
+    next();
   });
 
   // Expose API documentation only in non-production environments.

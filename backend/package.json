@@ -55,6 +55,7 @@
     "rxjs": "^7.8.2",
     "sanitize-html": "^2.17.1",
     "svg-captcha": "^1.4.0",
+    "ua-parser-js": "^2.0.9",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0",
     "zod": "^4.3.6"
@@ -72,6 +73,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/qrcode": "^1.5.6",
     "@types/supertest": "^6.0.2",
+    "@types/ua-parser-js": "^0.7.39",
     "@types/winston": "^2.4.4",
     "jest": "^29.7.0",
     "supertest": "^7.0.0",

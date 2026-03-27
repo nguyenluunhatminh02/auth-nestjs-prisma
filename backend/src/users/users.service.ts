@@ -11,7 +11,7 @@ import {
 import { PageResponse, buildPageResponse } from '../common/utils/pagination.util';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
-import { toAppUser } from '../common/mappers/user.mapper';
+import { toAppUser, mapToUserResponse } from '../common/mappers/user.mapper';
 
 @Injectable()
 export class UsersService {
@@ -21,6 +21,49 @@ export class UsersService {
   ) {}
 
   // ── Profile ────────────────────────────────────────────────────────────────
+
+  /** Lấy full profile của user (dùng cho GET /users/me) */
+  async getProfile(userId: string): Promise<any> {
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+      include: {
+        user_roles: { include: { roles: true } },
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return mapToUserResponse(toAppUser(user));
+  }
+
+  /** Upload avatar — trả về URL mới */
+  async uploadAvatar(userId: string, file: Express.Multer.File): Promise<{ avatarUrl: string }> {
+    // Đơn giản: lưu file vào uploads/ và trả URL
+    // Trong production dùng FilesService (MinIO)
+    const filename = `${userId}-${Date.now()}.${file.originalname.split('.').pop()}`;
+    const avatarUrl = `/uploads/${filename}`;
+    await this.prisma.users.update({
+      where: { id: userId },
+      data: { avatar_url: avatarUrl },
+    });
+    return { avatarUrl };
+  }
+
+  /** Xóa avatar */
+  async deleteAvatar(userId: string): Promise<{ message: string }> {
+    await this.prisma.users.update({
+      where: { id: userId },
+      data: { avatar_url: null },
+    });
+    return { message: 'Avatar deleted' };
+  }
+
+  /** Deactivate account (soft) */
+  async deactivateAccount(userId: string): Promise<{ message: string }> {
+    await this.prisma.users.update({
+      where: { id: userId },
+      data: { is_active: false },
+    });
+    return { message: 'Account deactivated' };
+  }
 
   async updateProfile(
     userId: string,

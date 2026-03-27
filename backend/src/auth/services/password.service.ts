@@ -7,7 +7,7 @@ import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../email/email.service';
 import { PasswordHistoryService } from './password-history.service';
-import { RefreshTokenService } from './refresh-token.service';
+import { TokenService } from './token.service';
 import { AuditLogService } from '../../common/services/audit-log.service';
 import { BCRYPT_ROUNDS, PASSWORD_RESET_EXPIRY_MS } from '../../common/constants/auth.constants';
 import { extractRequestContext } from '../../common/utils/request-context.util';
@@ -22,7 +22,7 @@ export class PasswordService {
     private prisma: PrismaService,
     private emailService: EmailService,
     private passwordHistoryService: PasswordHistoryService,
-    private refreshTokenService: RefreshTokenService,
+    private tokenService: TokenService,
     private auditLogService: AuditLogService,
   ) {}
 
@@ -110,7 +110,7 @@ export class PasswordService {
       where: { id: user.id },
       data: { password: newPasswordHash },
     });
-    await this.refreshTokenService.revokeAllForUser(user.id);
+    await this.tokenService.revokeAllSessions(user.id);
     const ctx = extractRequestContext(req);
     await this.auditLogService.recordLoginHistory(user, LoginAction.PASSWORD_CHANGED, ctx, true);
 
