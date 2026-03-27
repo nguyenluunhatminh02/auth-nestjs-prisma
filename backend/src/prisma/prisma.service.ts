@@ -1,6 +1,8 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -8,13 +10,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const host = configService.get<string>('database.host');
     const port = configService.get<number>('database.port');
     const username = configService.get<string>('database.username');
-    const password = encodeURIComponent(configService.get<string>('database.password'));
+    const password = configService.get<string>('database.password');
     const database = configService.get<string>('database.name');
     const ssl = configService.get<boolean>('database.ssl');
 
-    const url = `postgresql://${username}:${password}@${host}:${port}/${database}?schema=public${ssl ? '&sslmode=require' : ''}`;
+    const url = `postgresql://${username}:${encodeURIComponent(password)}@${host}:${port}/${database}?schema=public${ssl ? '&sslmode=require' : ''}`;
     process.env.DATABASE_URL = process.env.DATABASE_URL || url;
-    super();
+
+    const pool = new Pool({ connectionString: url });
+    const adapter = new PrismaPg(pool);
+    super({ adapter });
   }
 
   async onModuleInit() {

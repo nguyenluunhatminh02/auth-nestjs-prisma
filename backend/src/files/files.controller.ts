@@ -35,6 +35,9 @@ export class FilesController {
   @Delete()
   @ApiOperation({ summary: 'Delete a file' })
   deleteFile(@Query('fileName') fileName: string) {
+    if (!fileName || fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+      return { success: false, message: 'Invalid file name' };
+    }
     return this.fileStorageService.deleteFile(fileName);
   }
 }

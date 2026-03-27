@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -11,6 +11,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { FilesModule } from './files/files.module';
 import { HealthModule } from './common/health/health.module';
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
+import { CsrfGuard } from './common/guards/csrf.guard';
 import configuration from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -19,6 +20,11 @@ import { PrismaModule } from './prisma/prisma.module';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
+      envFilePath: [
+        `${__dirname}/../../.env`,
+        `${process.cwd()}/.env`,
+        '.env',
+      ],
     }),
     PrismaModule,
     ThrottlerModule.forRootAsync({
@@ -43,6 +49,10 @@ import { PrismaModule } from './prisma/prisma.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: RequestLoggingInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
     },
   ],
 })

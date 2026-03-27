@@ -210,6 +210,41 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Atomically increment a counter and set its expiry on the first increment.
+   *
+   * Uses a Lua script so that INCR and (conditional) EXPIRE execute as a single
+   * atomic unit — no race between the two operations.
+   *
+   * @param key     - Redis key
+   * @param windowSeconds - TTL applied only when the key is brand-new (count == 1)
+   * @returns the new counter value after increment
+   */
+  async incrWithExpiry(key: string, windowSeconds: number): Promise<number> {
+    if (!this.isConnected) {
+      this.logger.warn(`Redis not available, returning 1 for incrWithExpiry: ${key}`);
+      return 1;
+    }
+
+    // Lua script: INCR atomically, then EXPIRE only on the very first increment
+    const luaScript = `
+      local current = redis.call('INCR', KEYS[1])
+      if current == 1 then
+        redis.call('EXPIRE', KEYS[1], ARGV[1])
+      end
+      return current
+    `;
+
+    try {
+      const result = await (this.client as any).eval(luaScript, 1, key, windowSeconds.toString());
+      return result as number;
+    } catch (err) {
+      this.logger.error(`Redis incrWithExpiry error for key ${key}: ${err.message}`);
+      this.isConnected = false;
+      return 1;
+    }
+  }
+
+  /**
    * Increment a key's value
    */
   async incr(key: string): Promise<number> {

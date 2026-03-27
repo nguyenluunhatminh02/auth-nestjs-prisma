@@ -24,7 +24,7 @@ export class CsrfGuard implements CanActivate {
     private readonly reflector: Reflector,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     // Check if route is public (exempt from CSRF)
     const isPublic = this.reflector.getAllAndOverride<boolean>('isPublic', [
       context.getHandler(),
@@ -41,8 +41,8 @@ export class CsrfGuard implements CanActivate {
     // For GET, HEAD, OPTIONS requests, generate and set CSRF token
     if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       const sessionId = this.getSessionId(request);
-      const token = this.csrfService.generateSignedToken(sessionId);
-      
+      const token = await this.csrfService.generateSignedToken(sessionId);
+
       // Set CSRF token in response header and cookie
       response.setHeader(this.HEADER_NAME, token);
       response.cookie('csrf_token', token, {
@@ -93,28 +93,33 @@ export class CsrfGuard implements CanActivate {
       return bodyToken;
     }
 
-    // Check query parameter (not recommended, but included for compatibility)
-    const queryToken = request.query?.csrf_token;
-    if (queryToken) {
-      return queryToken;
-    }
-
+    // NOTE: Query-parameter CSRF tokens are intentionally NOT supported —
+    // they appear in server logs, proxy logs and Referer headers (OWASP).
     return null;
   }
 
   /**
-   * Extract session ID from request
-   * 
-   * @param request - The HTTP request
-   * @returns The session ID or a default value
+   * Extract session ID from request.
+   *
+   * Priority order:
+   *  1. Authenticated user ID (set by JwtAuthGuard which runs before this guard).
+   *     Using a per-user ID means CSRF tokens are scoped to individual users, not to
+   *     a shared IP — which would allow users behind the same NAT/VPN to reuse
+   *     each other's tokens.
+   *  2. Session ID (express-session, if configured).
+   *  3. IP address — last-resort fallback for unauthenticated GET requests only.
    */
   private getSessionId(request: any): string {
-    // Try to get session ID from request
+    // Prefer the authenticated user's ID (populated by JWT guard)
+    if (request.user?.id) {
+      return `user:${request.user.id}`;
+    }
+
     if (request.session?.id) {
       return request.session.id;
     }
 
-    // Fall back to IP address (not ideal, but works for simple cases)
-    return request.ip || 'unknown';
+    // Only reached for unauthenticated requests (e.g. public GET endpoints)
+    return `ip:${request.ip ?? 'unknown'}`;
   }
 }

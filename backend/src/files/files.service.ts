@@ -11,6 +11,34 @@ import * as path from 'path';
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
+// Strict allowlist of permitted file extensions for general uploads.
+// Excludes executables, scripts, HTML, SVG (XSS vectors) and server-side langs.
+const ALLOWED_UPLOAD_EXTENSIONS = new Set([
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff',
+  '.pdf',
+  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.txt', '.csv', '.rtf', '.odt', '.ods', '.odp',
+  '.zip', '.tar', '.gz',
+]);
+
+// Avatar uploads: image types only
+const ALLOWED_AVATAR_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+
+// Allowed MIME types — checked alongside extension (both must match intent)
+const ALLOWED_UPLOAD_MIMETYPES = new Set([
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain', 'text/csv',
+  'application/zip', 'application/x-tar', 'application/gzip',
+  'application/octet-stream', // fallback; extension check still applies
+]);
+
 export interface FileUploadResult {
   fileName: string;
   fileUrl: string;
@@ -153,7 +181,16 @@ export class FileStorageService implements OnModuleInit {
       throw new BadRequestException('File size exceeds 10MB limit');
     }
 
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_UPLOAD_EXTENSIONS.has(ext)) {
+      throw new BadRequestException(
+        `File type '${ext || '(no extension)'}' is not allowed. Permitted types: ${[...ALLOWED_UPLOAD_EXTENSIONS].join(', ')}`,
+      );
+    }
+    if (!ALLOWED_UPLOAD_MIMETYPES.has(file.mimetype)) {
+      throw new BadRequestException('File MIME type is not permitted');
+    }
+
     const uniqueName = `${folder}/${crypto.randomUUID()}${ext}`;
 
     try {
@@ -183,6 +220,12 @@ export class FileStorageService implements OnModuleInit {
     }
 
     if (!file) throw new BadRequestException('No file provided');
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_AVATAR_EXTENSIONS.has(ext)) {
+      throw new BadRequestException(
+        `Avatar must have an image extension: ${[...ALLOWED_AVATAR_EXTENSIONS].join(', ')}`,
+      );
+    }
     if (!file.mimetype.startsWith('image/')) {
       throw new BadRequestException('Avatar must be an image');
     }

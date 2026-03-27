@@ -36,10 +36,12 @@ export class TransformInterceptor<T>
 
         if (data && typeof data === 'object' && 'message' in data) {
           message = data.message;
-          // If only message field, set data to null
-          const keys = Object.keys(data);
-          if (keys.length === 1 && keys[0] === 'message') {
+          const { message: _, ...rest } = data;
+          const keys = Object.keys(rest);
+          if (keys.length === 0) {
             responseData = null;
+          } else {
+            responseData = rest;
           }
         }
 

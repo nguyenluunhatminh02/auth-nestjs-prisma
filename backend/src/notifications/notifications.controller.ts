@@ -34,7 +34,7 @@ export class NotificationsController {
     @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
     @Query('size', new DefaultValuePipe(20), ParseIntPipe) size: number,
   ) {
-    return this.notifService.getNotifications(user.id, page, Math.min(size, 100));
+    return this.notifService.getNotifications(user.id, page, Math.min(Math.max(1, size), 100));
   }
 
   @Get('unread')
@@ -46,7 +46,7 @@ export class NotificationsController {
     @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
     @Query('size', new DefaultValuePipe(20), ParseIntPipe) size: number,
   ) {
-    return this.notifService.getUnreadNotifications(user.id, page, Math.min(size, 100));
+    return this.notifService.getUnreadNotifications(user.id, page, Math.min(Math.max(1, size), 100));
   }
 
   @Get('type/:type')
@@ -59,7 +59,7 @@ export class NotificationsController {
     @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
     @Query('size', new DefaultValuePipe(20), ParseIntPipe) size: number,
   ) {
-    return this.notifService.getNotificationsByType(user.id, type, page, Math.min(size, 100));
+    return this.notifService.getNotificationsByType(user.id, type, page, Math.min(Math.max(1, size), 100));
   }
 
   @Get('unread-count')

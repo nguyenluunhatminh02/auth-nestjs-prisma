@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createHash } from 'crypto';
+import * as bcrypt from 'bcrypt';
+import { timingSafeEqual } from 'crypto';
 
 /**
  * Predefined security questions
@@ -78,31 +79,18 @@ export class SecurityQuestionService {
    * @param salt - Optional salt for hashing (default: empty)
    * @returns The hashed answer
    */
-  hashAnswer(answer: string, salt: string = ''): string {
-    // Normalize answer: lowercase, trim, remove extra spaces
+  hashAnswer(answer: string, _salt: string = ''): Promise<string> {
     const normalized = answer.toLowerCase().trim().replace(/\s+/g, ' ');
-    
-    // Create hash with salt
-    return createHash('sha256')
-      .update(normalized + salt)
-      .digest('hex');
+    return bcrypt.hash(normalized, 10);
   }
 
-  /**
-   * Validate a security question answer
-   * 
-   * @param answer - The user's answer
-   * @param hashedAnswer - The stored hashed answer
-   * @param salt - Optional salt used for hashing (default: empty)
-   * @returns True if the answer matches
-   */
-  validateAnswer(
+  async validateAnswer(
     answer: string,
     hashedAnswer: string,
-    salt: string = '',
-  ): boolean {
-    const hashedInput = this.hashAnswer(answer, salt);
-    return hashedInput === hashedAnswer;
+    _salt: string = '',
+  ): Promise<boolean> {
+    const normalized = answer.toLowerCase().trim().replace(/\s+/g, ' ');
+    return bcrypt.compare(normalized, hashedAnswer);
   }
 
   /**
@@ -182,12 +170,11 @@ export class SecurityQuestionService {
    * @param sortOrder - Optional sort order
    * @returns Security question data with hashed answer
    */
-  createSecurityQuestionData(
+  async createSecurityQuestionData(
     question: string,
     answer: string,
     sortOrder?: number,
-  ): SecurityQuestionData {
-    // Validate question and answer
+  ): Promise<SecurityQuestionData> {
     if (!this.isValidQuestion(question)) {
       throw new Error('Invalid security question');
     }
@@ -196,9 +183,8 @@ export class SecurityQuestionService {
       throw new Error('Invalid security answer');
     }
 
-    // Generate salt and hash answer
     const salt = this.generateSalt();
-    const hashedAnswer = this.hashAnswer(answer, salt);
+    const hashedAnswer = await this.hashAnswer(answer, salt);
 
     return {
       question: this.normalizeQuestion(question),
@@ -244,6 +230,6 @@ export class SecurityQuestionService {
    * @returns Maximum allowed questions
    */
   getMaximumQuestionCount(): number {
-    return 5;
+    return 3;
   }
 }

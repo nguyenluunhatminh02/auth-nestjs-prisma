@@ -14,6 +14,7 @@ export class ResetPasswordDto {
   token: string;
 
   @ApiProperty()
+  @IsNotEmpty()
   @IsString()
   @MinLength(8)
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).+$/, {
@@ -30,6 +31,7 @@ export class ChangePasswordDto {
   currentPassword: string;
 
   @ApiProperty()
+  @IsNotEmpty()
   @IsString()
   @MinLength(8)
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).+$/, {

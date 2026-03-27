@@ -11,6 +11,7 @@ import {
 import { PageResponse, buildPageResponse } from '../common/utils/pagination.util';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { toAppUser } from '../common/mappers/user.mapper';
 
 @Injectable()
 export class UsersService {
@@ -52,7 +53,7 @@ export class UsersService {
       },
     });
 
-    return this.toAppUser(updated);
+    return toAppUser(updated);
   }
 
   async updateAvatar(userId: string, avatarUrl: string): Promise<User> {
@@ -67,7 +68,7 @@ export class UsersService {
       },
     });
 
-    return this.toAppUser(updated);
+    return toAppUser(updated);
   }
 
   // ── Notification preferences ──────────────────────────────────────────────────
@@ -222,21 +223,24 @@ export class UsersService {
     const user = await this.prisma.users.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    // Replace existing questions
-    await this.prisma.security_questions.deleteMany({ where: { user_id: userId } });
+    // Replace existing questions atomically so a partial failure never leaves
+    // the user with fewer questions than they submitted.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.security_questions.deleteMany({ where: { user_id: userId } });
 
-    for (let i = 0; i < questions.length; i += 1) {
-      const q = questions[i];
-      const answerHash = await bcrypt.hash(q.answer.toLowerCase().trim(), 10);
-      await this.prisma.security_questions.create({
-        data: {
-          user_id: userId,
-          question: q.question,
-          answer_hash: answerHash,
-          sort_order: i,
-        },
-      });
-    }
+      for (let i = 0; i < questions.length; i += 1) {
+        const q = questions[i];
+        const answerHash = await bcrypt.hash(q.answer.toLowerCase().trim(), 10);
+        await tx.security_questions.create({
+          data: {
+            user_id: userId,
+            question: q.question,
+            answer_hash: answerHash,
+            sort_order: i,
+          },
+        });
+      }
+    });
   }
 
   async getSecurityQuestions(userId: string): Promise<string[]> {
@@ -308,57 +312,6 @@ export class UsersService {
       size,
       total,
     );
-  }
-
-  private toAppUser(user: any): User {
-    return {
-      id: user.id,
-      email: user.email,
-      password: user.password,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      phone: user.phone,
-      avatarUrl: user.avatar_url,
-      dateOfBirth: user.date_of_birth,
-      gender: user.gender,
-      provider: user.provider,
-      providerId: user.provider_id,
-      emailVerified: user.email_verified,
-      emailVerificationToken: user.email_verification_token,
-      emailVerificationExpiry: user.email_verification_expiry,
-      passwordResetToken: user.password_reset_token,
-      passwordResetExpiry: user.password_reset_expiry,
-      twoFactorEnabled: user.two_factor_enabled,
-      twoFactorSecret: user.two_factor_secret,
-      isActive: user.is_active,
-      isLocked: user.is_locked,
-      failedLoginAttempts: user.failed_login_attempts,
-      lockTime: user.lock_time,
-      lastLoginAt: user.last_login_at,
-      lastLoginIp: user.last_login_ip,
-      isDeleted: user.is_deleted,
-      deletedAt: user.deleted_at,
-      language: user.language,
-      timezone: user.timezone,
-      notificationEmailEnabled: user.notification_email_enabled,
-      notificationPushEnabled: user.notification_push_enabled,
-      notificationInAppEnabled: user.notification_in_app_enabled,
-      notificationSecurityEnabled: user.notification_security_enabled,
-      notificationOrderEnabled: user.notification_order_enabled,
-      notificationPromotionEnabled: user.notification_promotion_enabled,
-      profilePublic: user.profile_public,
-      showEmail: user.show_email,
-      showPhone: user.show_phone,
-      showActivityStatus: user.show_activity_status,
-      deleteStatus: user.delete_status,
-      deleteRequestedAt: user.delete_requested_at,
-      fcmToken: user.fcm_token,
-      roles: (user.user_roles ?? []).map((x: any) => x.roles),
-      refreshTokens: [],
-      loginHistories: [],
-      createdAt: user.created_at,
-      updatedAt: user.updated_at,
-    } as User;
   }
 }
 

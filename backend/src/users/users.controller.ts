@@ -17,10 +17,11 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { Request } from 'express';
 import { UsersService } from './users.service';
-import { AuthService } from '../auth/services/auth.service';
+import { SessionService } from '../auth/services/session.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from './entities/user.entity';
+import { mapToUserResponse } from '../common/mappers/user.mapper';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateNotificationPreferencesDto, UpdatePrivacySettingsDto } from './dto/update-settings.dto';
 import { UpdateFcmTokenDto } from './dto/update-fcm-token.dto';
@@ -33,7 +34,7 @@ import { SetupSecurityQuestionsDto } from './dto/security-questions.dto';
 export class UsersController {
   constructor(
     private usersService: UsersService,
-    private authService: AuthService,
+    private sessionService: SessionService,
   ) {}
 
   // ── Profile ────────────────────────────────────────────────────────────────
@@ -41,7 +42,7 @@ export class UsersController {
   @Get()
   @ApiOperation({ summary: 'Get current user profile' })
   getMe(@CurrentUser() user: User) {
-    return this.authService.mapToUserResponse(user);
+    return mapToUserResponse(user);
   }
 
   @Put()
@@ -54,7 +55,7 @@ export class UsersController {
       ...dto,
       dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
     });
-    return this.authService.mapToUserResponse(updated);
+    return mapToUserResponse(updated);
   }
 
   // ── Delete account ────────────────────────────────────────────────────────────
@@ -66,14 +67,14 @@ export class UsersController {
     @CurrentUser() user: User & { accessToken: string },
     @Req() req: Request,
   ) {
-    await this.authService.deleteAccount(user, user.accessToken, req);
+    await this.sessionService.deleteAccount(user, user.accessToken, req);
     return { message: 'Account deletion requested. You have 30 days to cancel.' };
   }
 
   @Post('cancel-delete')
   @ApiOperation({ summary: 'Cancel account deletion' })
   async cancelDelete(@CurrentUser() user: User) {
-    await this.authService.cancelDeleteAccount(user);
+    await this.sessionService.cancelDeleteAccount(user);
     return { message: 'Account deletion cancelled' };
   }
 
@@ -187,7 +188,7 @@ export class UsersController {
     @CurrentUser() user: User & { accessToken: string },
     @Req() req: Request,
   ) {
-    await this.authService.logoutSession(user.accessToken, sessionId, user, req);
+    await this.sessionService.logoutSession(user.accessToken, sessionId, user, req);
     return { message: 'Session logged out' };
   }
 
@@ -202,7 +203,9 @@ export class UsersController {
     @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
     @Query('size', new DefaultValuePipe(20), ParseIntPipe) size: number,
   ) {
-    return this.usersService.getLoginHistory(user.id, page, size);
+    // Cap size to prevent unbounded queries that exhaust memory / DB resources
+    const cappedSize = Math.min(Math.max(1, size), 100);
+    return this.usersService.getLoginHistory(user.id, page, cappedSize);
   }
 }
 

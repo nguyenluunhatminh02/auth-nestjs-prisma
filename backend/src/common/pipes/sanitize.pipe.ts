@@ -62,18 +62,20 @@ const DEFAULT_SANITIZE_OPTIONS: SanitizeOptions = {
 export class SanitizePipe implements PipeTransform {
   private readonly logger = new Logger(SanitizePipe.name);
   private readonly options: SanitizeOptions;
+  private static readonly SENSITIVE_FIELDS = new Set([
+    'password', 'currentPassword', 'newPassword', 'confirmPassword',
+    'token', 'code', 'totpCode', 'refreshToken', 'accessToken',
+  ]);
 
   constructor(options?: SanitizeOptions) {
     this.options = { ...DEFAULT_SANITIZE_OPTIONS, ...options };
   }
 
   transform(value: any, metadata: ArgumentMetadata): any {
-    // Skip if value is not an object or is null/undefined
     if (!value || typeof value !== 'object') {
       return value;
     }
 
-    // Skip if this is a file upload
     if (value instanceof File || value instanceof Buffer) {
       return value;
     }
@@ -86,13 +88,6 @@ export class SanitizePipe implements PipeTransform {
     }
   }
 
-  /**
-   * Sanitize an object recursively
-   * 
-   * @param obj - The object to sanitize
-   * @param metadata - The argument metadata
-   * @returns The sanitized object
-   */
   private sanitizeObject(obj: any, metadata: ArgumentMetadata): any {
     if (Array.isArray(obj)) {
       return obj.map(item => this.sanitizeValue(item, metadata));
@@ -107,34 +102,18 @@ export class SanitizePipe implements PipeTransform {
     return sanitized;
   }
 
-  /**
-   * Sanitize a value
-   * 
-   * @param value - The value to sanitize
-   * @param metadata - The argument metadata
-   * @returns The sanitized value
-   */
   private sanitizeValue(value: any, metadata: ArgumentMetadata): any {
-    // Handle strings
     if (typeof value === 'string') {
       return this.sanitizeString(value);
     }
 
-    // Handle objects
     if (typeof value === 'object' && value !== null) {
       return this.sanitizeObject(value, metadata);
     }
 
-    // Return other types as-is
     return value;
   }
 
-  /**
-   * Sanitize a string
-   * 
-   * @param str - The string to sanitize
-   * @returns The sanitized string
-   */
   private sanitizeString(str: string): string {
     return sanitizeHtml(str, {
       allowedTags: this.options.allowedTags || [],

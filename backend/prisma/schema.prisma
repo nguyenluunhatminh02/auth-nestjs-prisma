@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -116,6 +117,7 @@ model users {
   password_reset_expiry          DateTime?                @db.Timestamp(6)
   two_factor_enabled             Boolean                  @default(false)
   two_factor_secret              String?                  @db.VarChar
+  mfa_backup_codes               String[]
   is_active                      Boolean                  @default(true)
   is_locked                      Boolean                  @default(false)
   failed_login_attempts          Int                      @default(0)
@@ -145,6 +147,20 @@ model users {
   refresh_tokens                 refresh_tokens[]
   security_questions             security_questions[]
   user_roles                     user_roles[]
+  password_history               password_history[]
+
+  @@index([email_verification_token], map: "idx_users_email_verification_token")
+  @@index([password_reset_token], map: "idx_users_password_reset_token")
+}
+
+model password_history {
+  id            String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  password_hash String   @db.VarChar(255)
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+  user_id       String?  @db.Uuid
+  users         users?   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id])
 }
 
 enum login_history_action_enum {

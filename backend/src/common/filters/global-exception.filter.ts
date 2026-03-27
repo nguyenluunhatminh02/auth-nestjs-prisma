@@ -35,8 +35,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         }
       }
     } else if (exception instanceof Error) {
-      message = exception.message;
+      // Log full details internally but NEVER expose internal messages to clients
+      // (leaks DB hostnames, file paths, stack traces — OWASP A05)
       this.logger.error(exception.message, exception.stack);
+      // message retains its default 'Internal server error'
     }
 
     response.status(status).json({

@@ -41,7 +41,7 @@ export class TokenBlacklistService {
    */
   async isBlacklisted(token: string): Promise<boolean> {
     if (!this.redis.isAvailable()) {
-      this.logger.warn('Redis not available, assuming token is not blacklisted');
+      this.logger.warn('Redis not available - failing open for token blacklist check');
       return false;
     }
 
@@ -50,7 +50,7 @@ export class TokenBlacklistService {
       return await this.redis.exists(key);
     } catch (err) {
       this.logger.error(`Failed to check token blacklist: ${err.message}`);
-      return false;
+      return true;
     }
   }
 
@@ -85,11 +85,55 @@ export class TokenBlacklistService {
     }
 
     try {
-      // Note: This requires storing userId:token mapping or using a different pattern
-      // For now, this is a placeholder for future enhancement
+      // Store a marker that indicates all tokens for this user should be blacklisted
+      // This is checked during token validation in JwtStrategy
+      const userBlacklistKey = `${this.PREFIX}user:${userId}`;
+      await this.redis.set(userBlacklistKey, '1', 86400); // 24 hours
+      
       this.logger.log(`All tokens for user ${userId} marked for blacklisting`);
     } catch (err) {
       this.logger.error(`Failed to blacklist all user tokens: ${err.message}`);
+    }
+  }
+
+  /**
+   * Check if all tokens for a user are blacklisted
+   * This is checked during token validation in JwtStrategy
+   * @param userId - User ID
+   * @returns true if all tokens for the user are blacklisted, false otherwise
+   */
+  async areAllUserTokensBlacklisted(userId: string): Promise<boolean> {
+    if (!this.redis.isAvailable()) {
+      this.logger.warn('Redis not available - failing open for user blacklist check');
+      return false;
+    }
+
+    try {
+      const userBlacklistKey = `${this.PREFIX}user:${userId}`;
+      return await this.redis.exists(userBlacklistKey);
+    } catch (err) {
+      this.logger.error(`Failed to check user token blacklist: ${err.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Clear the user blacklist marker
+   * This is called when a user logs in again after logout-all
+   * @param userId - User ID
+   */
+  async clearUserBlacklist(userId: string): Promise<void> {
+    if (!this.redis.isAvailable()) {
+      this.logger.warn('Redis not available, skipping user blacklist clearing');
+      return;
+    }
+
+    try {
+      const userBlacklistKey = `${this.PREFIX}user:${userId}`;
+      await this.redis.del(userBlacklistKey);
+      this.logger.log(`Cleared blacklist for user ${userId}`);
+    } catch (err) {
+      this.logger.error(`Failed to clear user blacklist: ${err.message}`);
     }
   }
 

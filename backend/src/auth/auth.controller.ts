@@ -23,11 +23,15 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleOAuthGuard, GithubOAuthGuard } from './guards/oauth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
+import { RateLimit } from '../common/decorators/rate-limit.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { RateLimitGuard } from '../common/guards/rate-limit.guard';
 import { User } from '../users/entities/user.entity';
 import { ConfigService } from '@nestjs/config';
 
 @ApiTags('auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RateLimitGuard)
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -38,6 +42,7 @@ export class AuthController {
   // ─── Registration & Verification ─────────────────────────────────────────────
 
   @Public()
+  @RateLimit('REGISTER')
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
   register(@Body() dto: RegisterDto, @Req() req: Request) {
@@ -45,6 +50,7 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit('EMAIL_VERIFICATION')
   @Get('verify-email')
   @ApiOperation({ summary: 'Verify email address' })
   verifyEmail(@Query('token') token: string) {
@@ -52,6 +58,7 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit('EMAIL_VERIFICATION')
   @Post('resend-verification')
   @ApiOperation({ summary: 'Resend verification email' })
   resendVerification(@Body('email') email: string) {
@@ -61,6 +68,7 @@ export class AuthController {
   // ─── Login ────────────────────────────────────────────────────────────────────
 
   @Public()
+  @RateLimit('LOGIN')
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email and password' })
@@ -69,6 +77,7 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit('MFA')
   @Post('mfa/validate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Complete login with MFA code' })
@@ -79,6 +88,7 @@ export class AuthController {
   // ─── Token Refresh ────────────────────────────────────────────────────────────
 
   @Public()
+  @RateLimit('GENERAL')
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
@@ -111,9 +121,22 @@ export class AuthController {
     return this.authService.logoutAll(user.accessToken, user, req);
   }
 
+  @Post('logout/session/:sessionId')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logout a specific session' })
+  logoutSession(
+    @Param('sessionId') sessionId: string,
+    @CurrentUser() user: User & { accessToken: string },
+    @Req() req: Request,
+  ) {
+    return this.authService.logoutSession(user.accessToken, sessionId, user, req);
+  }
+
   // ─── Password ─────────────────────────────────────────────────────────────────
 
   @Public()
+  @RateLimit('PASSWORD_RESET')
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request password reset email' })
@@ -122,6 +145,7 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit('PASSWORD_RESET')
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset password with token' })
@@ -129,6 +153,7 @@ export class AuthController {
     return this.authService.resetPassword(dto);
   }
 
+  @RateLimit('GENERAL')
   @Post('change-password')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Change password (authenticated)' })
@@ -142,6 +167,7 @@ export class AuthController {
 
   // ─── MFA ─────────────────────────────────────────────────────────────────────
 
+  @RateLimit('MFA')
   @Post('mfa/setup')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Start MFA setup — returns QR code & backup codes' })
@@ -149,6 +175,7 @@ export class AuthController {
     return this.authService.setupMfa(user);
   }
 
+  @RateLimit('MFA')
   @Post('mfa/verify')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Verify TOTP code during setup and enable MFA' })
@@ -160,6 +187,7 @@ export class AuthController {
     return this.authService.verifyAndEnableMfa(dto, user, req);
   }
 
+  @RateLimit('MFA')
   @Post('mfa/disable')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Disable MFA with TOTP confirmation' })
@@ -169,6 +197,25 @@ export class AuthController {
     @Req() req: Request,
   ) {
     return this.authService.disableMfa(dto, user, req);
+  }
+
+  @Post('delete-account')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Request account deletion (30-day grace period)' })
+  deleteAccount(
+    @CurrentUser() user: User & { accessToken: string },
+    @Req() req: Request,
+  ) {
+    return this.authService.deleteAccount(user, user.accessToken, req);
+  }
+
+  @Post('cancel-delete-account')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cancel pending account deletion' })
+  cancelDeleteAccount(@CurrentUser() user: User) {
+    return this.authService.cancelDeleteAccount(user);
   }
 
   // ─── OAuth2 ───────────────────────────────────────────────────────────────────

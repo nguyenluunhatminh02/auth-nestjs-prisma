@@ -27,25 +27,15 @@ export class RequestLoggingInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap({
-        next: () => {
-          // Log request before it's sent
-          this.logger.log(
-            `[${method}] ${url} - IP: ${ip}, UA: ${userAgent?.substring(0, 50) || 'Unknown'}`,
-          );
-        },
         error: (error) => {
-          // Log errors
           const duration = Date.now() - startTime;
           this.logger.error(
             `[${method}] ${url} - ERROR: ${error.message} (${duration}ms) - IP: ${ip}`,
           );
         },
         complete: () => {
-          // Log response after it's sent
           const duration = Date.now() - startTime;
           const statusCode = response.statusCode;
-          const statusColor = statusCode >= 500 ? 'red' : statusCode >= 400 ? 'yellow' : 'green';
-          
           this.logger.log(
             `[${method}] ${url} - Status: ${statusCode} (${duration}ms) - IP: ${ip}`,
           );

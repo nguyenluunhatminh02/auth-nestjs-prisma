@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import * as svgCaptcha from 'svg-captcha';
 import { RedisService } from './redis.service';
 
@@ -9,8 +8,6 @@ import { RedisService } from './redis.service';
 export interface CaptchaResponse {
   /** The CAPTCHA image as SVG string */
   image: string;
-  /** The CAPTCHA text (for testing purposes only) */
-  text: string;
   /** The CAPTCHA ID */
   id: string;
 }
@@ -61,7 +58,6 @@ export class CaptchaService {
 
   constructor(
     private readonly redisService: RedisService,
-    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -101,7 +97,6 @@ export class CaptchaService {
       
       return {
         image: captcha.data,
-        text: captcha.text,
         id,
       };
     } catch (error) {
